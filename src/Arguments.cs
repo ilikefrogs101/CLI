@@ -1,6 +1,6 @@
 namespace ilikefrogs101.CLI;
 public class Arguments {
-    private static Dictionary<string, string> _arguments = new();
+    private Dictionary<string, string> _arguments = new();
 
     public void AddArgument(string name, string value) {
         _arguments[name] = value;
