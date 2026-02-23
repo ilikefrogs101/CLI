@@ -29,6 +29,8 @@ public static class CommandParser {
                 string flag = argument.Replace("--", "");
                 string value = "";
 
+                if (!command.Flags.ContainsKey(flag)) continue;
+                
                 if(!command.Flags[flag].Boolean) {
                     ++i;
                     value = arguments[i];
