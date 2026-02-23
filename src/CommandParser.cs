@@ -4,6 +4,8 @@ using ilikefrogs101.Logging;
 namespace ilikefrogs101.CLI;
 public static class CommandParser {
     public static void ParseCommand(string commandRaw) {
+        if (string.IsNullOrWhiteSpace(commandRaw)) _parsingFailed();
+
         string[] tokens = _tokenise(commandRaw);
 
         if(tokens.Length == 0) {
