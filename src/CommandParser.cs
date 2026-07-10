@@ -57,7 +57,7 @@ public static class CommandParser {
     }
 
     private static void _parsingFailed() {
-        string helpMenu = "Invalid Command \n\n\n" + CommandRegistry.HelpMenu();
+        string helpMenu = "Invalid Command \n\n" + CommandRegistry.HelpMenu();
         Log.OutputResponse(helpMenu);
     }
     private static string[] _tokenise(string command) {

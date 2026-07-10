@@ -5,7 +5,7 @@ public class Arguments {
     public void AddArgument(string name, string value) {
         _arguments[name] = value;
     }
-    public bool GetArgumentValue<T>(string name, out T value)
+    public bool GetArgumentValue<T>(string name, out T value, T defaultValue = default)
     {
         value = default!;
         if (_arguments.TryGetValue(name, out string rawValue))
@@ -17,7 +17,7 @@ public class Arguments {
             }
             catch
             {
-                value = default!;
+                value = defaultValue!;
                 return false;
             }
         }
