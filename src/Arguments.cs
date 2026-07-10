@@ -7,17 +7,13 @@ public class Arguments {
     }
     public bool GetArgumentValue<T>(string name, out T value, T defaultValue = default)
     {
-        value = default!;
-        if (_arguments.TryGetValue(name, out string rawValue))
-        {
-            try
-            {
+        value = defaultValue!;
+        if (_arguments.TryGetValue(name, out string rawValue)) {
+            try {
                 value = (T)Convert.ChangeType(rawValue, typeof(T));
                 return true;
             }
-            catch
-            {
-                value = defaultValue!;
+            catch {
                 return false;
             }
         }
