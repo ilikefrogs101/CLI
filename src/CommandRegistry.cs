@@ -44,34 +44,31 @@ public static class CommandRegistry {
 
         for(int i = 0; i < _commands.Count; ++i) {
             Command command = _commands.ElementAt(i).Value;
-            menu.Append(command.Name);
-            menu.Append(": ");
-            menu.Append(command.Description);
-            menu.Append("\n  Usage: ");
-            menu.Append(command.Name);
+            menu.Append($"{command.Name}: {command.Description}\n");
+            menu.Append($"\t{command.Name}");
             for(int j = 0; j < command.PositionalArguments.Count; ++j) {
                 if(command.PositionalArguments[j].ArgumentType == ArgumentType.PositionalOptional) {
-                    menu.Append(" ?");
+                    menu.Append(" [<");
                 }
                 else {
-                    menu.Append(" [");
+                    menu.Append(" <");
                 }
 
                 menu.Append(command.PositionalArguments[j].Name);
 
                 if(command.PositionalArguments[j].ArgumentType == ArgumentType.PositionalOptional) {
-                    menu.Append('?');
+                    menu.Append(">]");
                 }
                 else {
-                    menu.Append(']');
+                    menu.Append(">");
                 }           
             }
-            for(int j = 0; j < command.Flags.Count; ++j) {
-                menu.Append(" --");
+            for (int j = 0; j < command.Flags.Count; ++j) {
+                menu.Append("\n\t--");
                 menu.Append(command.Flags.ElementAt(j).Value.Name);
                 
                 if(!command.Flags.ElementAt(j).Value.Boolean)
-                    menu.Append(" [value]");
+                    menu.Append(" <value>");
             } 
             menu.Append("\n\n");
         }
