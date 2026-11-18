@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Immutable;
-using System.ComponentModel;
 using System.Linq;
-using ilikefrogs101.Logging;
 
 namespace ilikefrogs101.CLI;
 public interface IElement {
@@ -15,8 +13,7 @@ public record BaseCommand (
     ImmutableArray<Command> Subcommands,
     ImmutableArray<IElement> PositionalElements,
     ImmutableArray<Option> Options
-)
-{
+) {
     public BaseCommand() : this(
         null,
         ImmutableArray<Command>.Empty,
@@ -55,8 +52,7 @@ public record BaseCommand (
 public sealed record Command (
     string Name,
     string Description
-) : BaseCommand, IElement 
-{
+) : BaseCommand, IElement {
     new public Command WithHandler(Action<CommandContext> handler) {
         return this with {
             Handler = handler

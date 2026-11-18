@@ -1,16 +1,11 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
-using System.Reflection.Metadata;
-using System.Threading.Tasks;
 
 namespace ilikefrogs101.CLI;
 public sealed record ParsedCommand (
     Action<CommandContext> Handler,
     CommandContext Context
-)
-{
+) {
     public ParsedCommand() : this(
         null,
         new()
@@ -33,8 +28,7 @@ public sealed record ParsedCommand (
 public record CommandContext (
     ImmutableDictionary<string, object> Parameters,
     ImmutableDictionary<string, object> Options
-)
-{
+) {
     public CommandContext() : this(
         ImmutableDictionary<string, object>.Empty,
         ImmutableDictionary<string, object>.Empty

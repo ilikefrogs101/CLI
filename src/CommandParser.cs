@@ -1,16 +1,13 @@
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
-using ilikefrogs101.Logging;
 
 namespace ilikefrogs101.CLI;
 public static class CommandParser {
-    public static ParsedCommand Parse(BaseCommand root, string toParse) {
+    public static ParsedCommand Parse(string toParse, BaseCommand root) {
         ImmutableArray<string> tokens = _tokenise(toParse);
-        ParseState state = _parse(tokens, root);
+        ParseState state = _parseTokens(tokens, root);
 
         ParsedCommand parsed = new ParsedCommand()
             .WithHandler(state.Handler)
@@ -20,17 +17,17 @@ public static class CommandParser {
     }
 
     private static CommandContext _constructContext(ParseState state, ImmutableArray<string> tokens) {
-        CommandContext context = state.Parameters.Aggregate(
+        CommandContext initialContext = state.Parameters.Aggregate(
             new CommandContext(),
             (context, parameter) => context
                 .WithParameter(parameter.Key, parameter.Value)
         );
-        context = state.Options.Aggregate(
-            context,
+        CommandContext context = state.Options.Aggregate(
+            initialContext,
             (context, option) => context
                 .WithOption(option.Name, option.Parse(option.Default.ToString()))
         );
-        context = tokens
+        return tokens
             .Select((token, index) => (token, index))
             .Where(token => state.Options.Any(option => option.Name == token.token))
             .Aggregate(
@@ -44,16 +41,13 @@ public static class CommandParser {
                     return (current.context.WithOption(token.token, option.Parse(value)), option.Default is not bool);
                 }
             ).context;
-
-        return context;
     }
-    private static ParseState _parse(
+    private static ParseState _parseTokens(
         ImmutableArray<string> tokens, 
         BaseCommand command,
         int tokenIndex = 0,
         int positionalOffset = 0
-    )
-    {        
+    ) {        
         if (tokenIndex >= tokens.Length) return new();
         
         ParseState baseState = command.Options.Aggregate(
@@ -65,10 +59,10 @@ public static class CommandParser {
         if (baseState.Options.Any(option => option.Name == tokens[tokenIndex])) {
             Option opt = baseState.Options.FirstOrDefault(option => option.Name == tokens[tokenIndex]);
             if (opt.Default is bool) {
-                return _parse(tokens, command, tokenIndex + 1, positionalOffset + 1);
+                return _parseTokens(tokens, command, tokenIndex + 1, positionalOffset + 1);
             }
             else {
-                return _parse(tokens, command, tokenIndex + 1, positionalOffset + 2);
+                return _parseTokens(tokens, command, tokenIndex + 1, positionalOffset + 2);
             }
         }
 
@@ -78,15 +72,15 @@ public static class CommandParser {
         if (command.PositionalElements[counter] is SubcommandPlaceholder) {
             Command subcommand = command.Subcommands.FirstOrDefault(command => command.Name == tokens[tokenIndex]);
             ParseState parseState = baseState
-                .CombinedWith(_parse(tokens, subcommand, tokenIndex + 1, tokenIndex + 1))
-                .CombinedWith(_parse(tokens, command, tokenIndex + 1, positionalOffset));
+                .CombinedWith(_parseTokens(tokens, subcommand, tokenIndex + 1, tokenIndex + 1))
+                .CombinedWith(_parseTokens(tokens, command, tokenIndex + 1, positionalOffset));
             
             return parseState.WithHandler(parseState.Handler ?? subcommand.Handler);
         }
         else {
             Variable parameter = (Variable)command.PositionalElements[counter];
             ParseState parseState = baseState
-                .CombinedWith(_parse(tokens, command, tokenIndex + 1, positionalOffset))
+                .CombinedWith(_parseTokens(tokens, command, tokenIndex + 1, positionalOffset))
                 .WithParameter(parameter.Name, parameter.Parse(tokens[tokenIndex]));
 
             return parseState;
@@ -103,8 +97,7 @@ public sealed record ParseState(
     ImmutableHashSet<Option> Options,
     ImmutableDictionary<string, object> Parameters,
     Action<CommandContext> Handler
-)
-{
+) {
     public ParseState() : this(
         ImmutableHashSet<Option>.Empty,
         ImmutableDictionary<string, object>.Empty,
