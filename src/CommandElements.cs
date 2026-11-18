@@ -27,7 +27,7 @@ public record BaseCommand (
         };
     }
     public BaseCommand WithSubcommand(Command subcommand) {
-        return this with {
+        return _insertSubcommandPlaceholder() with {
             Subcommands = Subcommands.Add(subcommand),
         };
     }
@@ -41,7 +41,8 @@ public record BaseCommand (
             Options = Options.Add(option)
         };
     }
-    public BaseCommand WithSubcommandPlaceholder() {
+    
+    private BaseCommand _insertSubcommandPlaceholder() {
         if (PositionalElements.Any(element => element.GetType() == typeof(SubcommandPlaceholder))) return this;
 
         return this with {
@@ -59,7 +60,7 @@ public sealed record Command (
         };
     }
     new public Command WithSubcommand(Command subcommand) {
-        return this with {
+        return _insertSubcommandPlaceholder() with {
             Subcommands = Subcommands.Add(subcommand),
         };
     }
@@ -73,7 +74,8 @@ public sealed record Command (
             Options = Options.Add(option)
         };
     }
-    new public Command WithSubcommandPlaceholder() {
+
+    private Command _insertSubcommandPlaceholder() {
         if (PositionalElements.Any(element => element.GetType() == typeof(SubcommandPlaceholder))) return this;
 
         return this with {
