@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Nullable>disable</Nullable>
+    <NoWarn>IDE0090,IDE0290,IDE1006,IDE0028,IDE0044,IDE0305</NoWarn>
+    <SelfContained>true</SelfContained>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+  </PropertyGroup>
+</Project>

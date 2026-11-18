@@ -1,71 +1,136 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using ilikefrogs101.Logging;
 
 namespace ilikefrogs101.CLI;
 public static class CommandParser {
-    public static void ParseCommand(string commandRaw) {
-        if (string.IsNullOrWhiteSpace(commandRaw)) _parsingFailed();
+    public static ParsedCommand Parse(BaseCommand root, string toParse) {
+        ImmutableArray<string> tokens = _tokenise(toParse);
+        ParseState state = _parse(tokens, root);
 
-        string[] tokens = _tokenise(commandRaw);
+        ParsedCommand parsed = new ParsedCommand()
+            .WithHandler(state.Handler)
+            .WithContext(_constructContext(state, tokens));
 
-        if(tokens.Length == 0) {
-            _parsingFailed();
-            return;
-        }
+        return parsed;
+    }
 
-        string commandName = tokens[0];
-        string[] arguments = tokens.Length > 1 ? tokens[1..] : [];
-        
-        Command command = CommandRegistry.GetCommand(commandName);
-        if(command == null) {
-            _parsingFailed();
-            return;
-        }
+    private static CommandContext _constructContext(ParseState state, ImmutableArray<string> tokens) {
+        CommandContext context = state.Parameters.Aggregate(
+            new CommandContext(),
+            (context, parameter) => context
+                .WithParameter(parameter.Key, parameter.Value)
+        );
+        context = state.Options.Aggregate(
+            context,
+            (context, option) => context
+                .WithOption(option.Name, option.Parse(option.Default.ToString()))
+        );
+        context = tokens
+            .Select((token, index) => (token, index))
+            .Where(token => state.Options.Any(option => option.Name == token.token))
+            .Aggregate(
+                (context, skipNext: false),
+                (current, token) => {
+                    if (current.skipNext) return (current.context, false);
 
-        Arguments parsedArguments = new();
-        int position = 0;
-        for(int i = 0; i < arguments.Length; ++i) {
-            string argument = arguments[i];
+                    Option option = state.Options.First(option => option.Name == token.token);
+                    string value = option.Default is bool defaultValue ? (!defaultValue).ToString() : tokens[token.index + 1];
 
-            if(argument.StartsWith("--")) {
-                string flag = argument.Replace("--", "");
-                string value = "";
-
-                if (!command.Flags.ContainsKey(flag)) continue;
-                
-                if(!command.Flags[flag].Boolean) {
-                    ++i;
-                    value = arguments[i];
+                    return (current.context.WithOption(token.token, option.Parse(value)), option.Default is not bool);
                 }
+            ).context;
 
-                parsedArguments.AddArgument(flag, value);
+        return context;
+    }
+    private static ParseState _parse(
+        ImmutableArray<string> tokens, 
+        BaseCommand command,
+        int tokenIndex = 0,
+        int positionalOffset = 0
+    )
+    {        
+        if (tokenIndex >= tokens.Length) return new();
+        
+        ParseState baseState = command.Options.Aggregate(
+            new ParseState(),
+            (state, option) => state
+                .WithOption(option)
+        );
+
+        if (baseState.Options.Any(option => option.Name == tokens[tokenIndex])) {
+            Option opt = baseState.Options.FirstOrDefault(option => option.Name == tokens[tokenIndex]);
+            if (opt.Default is bool) {
+                return _parse(tokens, command, tokenIndex + 1, positionalOffset + 1);
             }
             else {
-                (string name, string value) = _parsePositionalArgument(command, position, arguments[i]);
-
-                if(name == null || value == null) {
-                    _parsingFailed();
-                    return;
-                }
-
-                parsedArguments.AddArgument(name, value);
-                ++position;
+                return _parse(tokens, command, tokenIndex + 1, positionalOffset + 2);
             }
         }
 
-        command.Execute?.Invoke(parsedArguments);
-    }
+        int counter = tokenIndex - positionalOffset;
+        if (counter >= command.PositionalElements.Length) return new();
+        
+        if (command.PositionalElements[counter] is SubcommandPlaceholder) {
+            Command subcommand = command.Subcommands.FirstOrDefault(command => command.Name == tokens[tokenIndex]);
+            ParseState parseState = baseState
+                .CombinedWith(_parse(tokens, subcommand, tokenIndex + 1, tokenIndex + 1))
+                .CombinedWith(_parse(tokens, command, tokenIndex + 1, positionalOffset));
+            
+            return parseState.WithHandler(parseState.Handler ?? subcommand.Handler);
+        }
+        else {
+            Variable parameter = (Variable)command.PositionalElements[counter];
+            ParseState parseState = baseState
+                .CombinedWith(_parse(tokens, command, tokenIndex + 1, positionalOffset))
+                .WithParameter(parameter.Name, parameter.Parse(tokens[tokenIndex]));
 
-    private static void _parsingFailed() {
-        string helpMenu = "Invalid Command \n\n" + CommandRegistry.HelpMenu();
-        Log.OutputResponse(helpMenu);
+            return parseState;
+        }
     }
-    private static string[] _tokenise(string command) {
-        return [.. Regex.Matches(command, @"(?<=^| )(""([^""]|(""""))*""|[^\s""]+)").Select(m => m.Value.Trim('"').Replace("\"\"", "\""))];
+    private static ImmutableArray<string> _tokenise(string command) {
+        return Regex.Matches(command, @"(?<=^| )(""([^""]|(""""))*""|[^\s""]+)")
+            .Select(m => m.Value.Trim('"').Replace("\"\"", "\""))
+            .ToImmutableArray();
     }
-    private static (string, string) _parsePositionalArgument(Command command, int position, string value) {
-        if(command.PositionalArguments.Count <= position) return (null, null);
+}
 
-        return (command.PositionalArguments[position].Name, value);
+public sealed record ParseState(
+    ImmutableHashSet<Option> Options,
+    ImmutableDictionary<string, object> Parameters,
+    Action<CommandContext> Handler
+)
+{
+    public ParseState() : this(
+        ImmutableHashSet<Option>.Empty,
+        ImmutableDictionary<string, object>.Empty,
+        null
+    ) {}
+    public ParseState CombinedWith(ParseState state) {
+        Action<CommandContext> handler = state.Handler ?? Handler;
+        return this with {
+            Options = Options.Union(state.Options),
+            Parameters = Parameters.SetItems(state.Parameters),
+            Handler = handler
+        };
+    }
+    public ParseState WithOption(Option option) {
+        return this with {
+            Options = Options.Add(option)
+        };
+    }
+    public ParseState WithParameter(string name, object value) {
+        return this with {
+            Parameters = Parameters.SetItem(name, value)
+        };
+    }
+    public ParseState WithHandler(Action<CommandContext> handler) {
+        return this with {
+            Handler = handler
+        };
     }
 }
